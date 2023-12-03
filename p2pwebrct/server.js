@@ -3,16 +3,17 @@ const express = require('express');
 const ACTIONS = require('./src/socket/actions');
 const { config } = require('process');
 const app = express();
+const {version, validate} = require('uuid');
 
 const server = require('http').createServer(app); //створення серверу
 const io = require('socket.io')(server); //підключаємо сокет
 
 const PORT = process.env.PORT || 3000; //переданий порт або 3000
 
-//дістати всі існуючі кімнати
+//дістати всі існуючі кімнати, які створювали клієнти
 function getClientRooms() {
     const {rooms} = io.sockets.adapter;
-    return Array.from(rooms.keys())
+    return Array.from(rooms.keys()).filter(roomID => validate(roomID) && version(roomID) === 4);
 }
 
 //інформування користувачів
@@ -34,7 +35,7 @@ io.on('connection', socket =>{
         }
 
         //Додавання в кімнату
-        const clients = Array.from(io.sockets.adapter.rooms.get(roomID) || []); 
+        const clients = Array.from(io.sockets.adapter.rooms[roomID] || []); 
         clients.forEach(clientID => {
             io.to(clientID).emit(ACTIONS.ADD_PEER, {
                 peerID: socket.id,
@@ -56,7 +57,7 @@ io.on('connection', socket =>{
     const {rooms} = socket;
 
     Array.from(rooms).forEach(roomID => {
-        const clients = Array.from(io.sockets.adapter.get(roomID) || []);
+        const clients = Array.from(io.sockets.adapter[roomID] || []);
 
 
         //інформування учасників про вихід учасника
