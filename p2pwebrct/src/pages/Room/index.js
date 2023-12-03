@@ -7,11 +7,11 @@ export default function Room() {
   const { clients, provideMediaRef } = useWebRTC(roomID);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'row' }}>
+    <div>
       {clients.map((clientID) => (
-        <div key={clientID} style={{ flex: 1 }}>
+        <div key={clientID} >
           <video
-            ref={(instance) => {
+            ref={instance => {
               provideMediaRef(clientID, instance);
             }}
             autoPlay

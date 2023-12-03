@@ -13,7 +13,7 @@ export default function useWebRTC(roomID){
         if (!clients.includes(newClient)) {
             updateClients(list => [...list, newClient], cb);
         }
-    }, [clients, updateClients]); //////////
+    }, [clients, updateClients]); 
 
     const peerConnections = useRef({}); //користувацькі конекшени
     const localMediaStream = useRef(null); //трансляція даних з камери і аудіо
@@ -21,7 +21,6 @@ export default function useWebRTC(roomID){
         [LOCAL_VIDEO]: null,
     }); //посилання на всі відео елемент на сторінці
 
-    ////////
 
 
     useEffect(() => {
@@ -34,7 +33,7 @@ export default function useWebRTC(roomID){
                 height: 720,
             }
         });
-///////////////////
+
         addNewClient(LOCAL_VIDEO, () => {
             const localVideoElement = peerMediaElements.current[LOCAL_VIDEO];
             //передача захопленого відео і звука на відео елемент на сторінці
@@ -48,6 +47,16 @@ export default function useWebRTC(roomID){
     startCapture()
     .then(() => socket.emit(ACTIONS.JOIN, {room: roomID}))
     .catch(e => console.error('Error getting userMedia:', e));
+
+    //вихід з кімнати
+    return () => {
+        if (localMediaStream.current) {
+            localMediaStream.current.getTracks().forEach(track => track.stop());
+        }
+        socket.emit(ACTIONS.LEAVE);
+    };
+    
+
     }, [roomID]);
 
     const provideMediaRef = useCallback((id, node) => {
