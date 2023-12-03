@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import socket from "../../socket";
 import ACTIONS from "../../socket/actions";
 import {v4} from 'uuid';
@@ -7,16 +7,20 @@ import {useNavigate} from 'react-router';
 export default function Main() {
     const history = useNavigate();
     const [rooms, updateRooms] = useState([]);
+    const rootNode = useRef();
 
     //Підписка на івент SHARE_ROOMS при вході на сторінку
     useEffect( () => {
         socket.on(ACTIONS.SHARE_ROOMS, ({rooms = []} = {}) => {
+            if (rootNode.current) {
+                updateRooms(rooms);
+            }
             updateRooms(rooms); //оновлюємо списком кімнат, коли вони приходять
         });
     }, [])
 
    return (
-    <div>
+    <div ref={rootNode}>
         <h1> Video chat</h1>
         <button onClick={() => {
             history(`/room/${v4()}`);
