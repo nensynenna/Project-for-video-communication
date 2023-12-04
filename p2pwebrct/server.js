@@ -79,6 +79,21 @@ io.on('connection', socket =>{
    socket.on(ACTIONS.LEAVE, leaveRoom);
    socket.on('disconnecting', leaveRoom);
 
+   //посилає на сокет інформацію про нову сесію
+   socket.on(ACTIONS.RELAY_SDP, ({peerID, sessionDescription}) => {
+    io.to(peerID).emit(ACTIONS.SESSION_DESCRIPTION, {
+        peerID: socket.id, 
+        sessionDescription,
+    });
+   });
+   //посилає на сокет інформацію про нового клієнта
+   socket.on(ACTIONS.RELAY_ICE, ({peerID, iceCandidate}) => {
+    io.to(peerID).emit(ACTIONS.ICE_CANDIDATE, {
+        peerID: socket.id,
+        iceCandidate,
+    });
+   });
+
     //console.log('Socket connected');
 });
 
