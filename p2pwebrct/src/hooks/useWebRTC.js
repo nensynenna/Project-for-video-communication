@@ -12,10 +12,15 @@ export default function useWebRTC(roomID){
 
     //додає клієнта, якщо його ще немає в кімнаті
     const addNewClient = useCallback((newClient, cb) => {
-        if (!clients.includes(newClient)) {
-            updateClients(list => [...list, newClient], cb);
-        }
-    }, [clients, updateClients]); 
+        updateClients(list => {
+          if (!list.includes(newClient)) {
+            return [...list, newClient]
+          }
+    
+          return list;
+        }, cb);
+      }, [clients, updateClients]);
+
 
     const peerConnections = useRef({}); //користувацькі конекшени
     const localMediaStream = useRef(null); //трансляція даних з камери і аудіо
@@ -27,52 +32,66 @@ export default function useWebRTC(roomID){
     //для додавання нового користувача
     useEffect(() => {
         async function handleNewPeer(peerID, createOffer) {
-            if (peerID in peerConnections.current) { //перевірка чи вже підключено
-                return console.warn (`Already connected to peer ${peerID}`);
+            if (peerID in peerConnections.current) {
+                return console.warn(`Already connected to peer ${peerID}`);
             }
+        
             peerConnections.current[peerID] = new RTCPeerConnection({
                 iceServers: freeice(),
             });
-
-            peerConnections.current[peerID].onicecandidate =  event => {
+        
+            peerConnections.current[peerID].onicecandidate = event => {
                 if (event.candidate) {
                     socket.emit(ACTIONS.RELAY_ICE, {
                         peerID,
                         iceCandidate: event.candidate,
                     });
                 }
-            }
-
+            };
+        
             let tracksNumber = 0;
+        
+            // трансляція відео нового користувача
+            peerConnections.current[peerID].ontrack = ({ streams: [remoteStream] }) => {
+                tracksNumber++;
+        
 
-            //трансляція відео нового користувача
-            peerConnections.current[peerID].ontrack = ({streams: [remoteStream]}) => {
-                tracksNumber++
-                
-                if (tracksNumber === 2) { // якщо є і відео і аудіо
+                if (tracksNumber === 2) {
+                    // якщо є і відео і аудіо
                     tracksNumber = 0;
-                
-                addNewClient(peerID, () =>{
-                    peerMediaElements.current[peerID].srcObject = remoteStream;
+        
+                    addNewClient(peerID, () => {
+                        if (!peerMediaElements.current[peerID]) {
+                            // Додайте новий елемент для нового користувача
+                            peerMediaElements.current[peerID] = document.createElement('video');
+                            peerMediaElements.current[peerID].autoplay = true;
+                            peerMediaElements.current[peerID].playsInline = true;
+                            provideMediaRef(peerID, peerMediaElements.current[peerID]);
+                        }
+        
+                        peerMediaElements.current[peerID].srcObject = remoteStream;
+                    });
+                }
+            };
+        
+            // додається контент, що буде відправлятися
+            localMediaStream.current.getTracks().forEach(track => {
+                peerConnections.current[peerID].addTrack(track, localMediaStream.current);
+            });
+        
+            if (createOffer) {
+                const offer = await peerConnections.current[peerID].createOffer();
+        
+                await peerConnections.current[peerID].setLocalDescription(offer);
+        
+                // відправка контенту
+                socket.emit(ACTIONS.RELAY_SDP, {
+                    peerID,
+                    sessionDescription: offer,
                 });
             }
         }
-        //додається контент, що буде відправлятися
-        localMediaStream.current.getTracks().forEach(track => {
-            peerConnections.current[peerID].addTrack(track, localMediaStream.current);
-        });
-
-        if (createOffer) {
-            const offer = await peerConnections.current[peerID].createOffer();
-
-            await peerConnections.current[peerID].setLocalDescription(offer);
-            //відправка контенту
-            socket.emit(ACTIONS.RELAY_SDP, {
-                peerID,
-                sessionDescription: offer,
-            });
-        }
-    }
+        
         socket.on(ACTIONS.ADD_PEER, handleNewPeer);
         return () => {
             socket.off(ACTIONS.ADD_PEER);
@@ -99,8 +118,8 @@ export default function useWebRTC(roomID){
         }
         socket.on(ACTIONS.SESSION_DESCRIPTION, setRemoteMedia)
             return () => {
-      socket.off(ACTIONS.SESSION_DESCRIPTION);
-    }
+                socket.off(ACTIONS.SESSION_DESCRIPTION);
+            }
     }, []);
 
     //реагує на нового кандидата
